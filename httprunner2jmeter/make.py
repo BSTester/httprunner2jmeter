@@ -12,6 +12,7 @@ from jmeter_api.configs.http_header_manager.elements import HTTPHeaderManager, H
 from jmeter_api.samplers.http_request.elements import HttpRequest, FileUpload, Method, Protocol
 from jmeter_api.controllers.simple_controller.elements import SimpleController
 from jmeter_api.post_processors.json_extractor.elements import JSONExtractor
+from jmeter_api.assertions.response.elements import ResponseAssertion, TestField, TestType
 from jmeter_api.assertions.json.elements import JSONAssertion
 from jmeter_api.thread_groups.common_thread_group.elements import CommonThreadGroup
 
@@ -159,17 +160,20 @@ $ pip install black
 
 
 def make_plan_config(config: Dict, plan_config: List = [], jmeter_variables: List = []) -> Text:
-    if config["variables"]:
-        variables = config["variables"]
-        if isinstance(variables, dict):
-            for k,v in variables.items():
-                plan_config.append(Argument(name=k, value=str(v)))
-                if k not in jmeter_variables: jmeter_variables.append(k)
     if ("base_url" in config) and ('base_url' not in jmeter_variables):
         net_url = urlsplit(config["base_url"])
         plan_config.append(Argument(name='base_url', value=net_url.hostname or ''))
         jmeter_variables.append('base_url')
-
+    if config["variables"]:
+        variables = config["variables"]
+        if isinstance(variables, dict):
+            for k,v in variables.items():
+                if k in jmeter_variables: continue
+                if k == "base_url":
+                    net_url = urlsplit(v)
+                    v = net_url.hostname
+                plan_config.append(Argument(name=k, value=str(v)))
+                jmeter_variables.append(k)
     return plan_config, jmeter_variables
 
 
@@ -237,7 +241,7 @@ def make_plan_teststep(teststep: Dict, jmeter_config = {}, jmeter_variables: Lis
 
     if teststep.get("request"):
         net_url = urlsplit(jmeter_config.get("base_url"))
-        jmeter_request = HttpRequest(host='${base_url}', protocol=Protocol(net_url.scheme.lower() or 'http'), port=net_url.port)
+        jmeter_request = HttpRequest(host='${base_url}', protocol=Protocol(net_url.scheme.lower() or 'https'), port=net_url.port)
         if "variables" in teststep:
             config = []
             variables = teststep["variables"]
@@ -285,6 +289,10 @@ def make_plan_teststep(teststep: Dict, jmeter_config = {}, jmeter_variables: Lis
                 expect = validator["expect"]
                 if not isinstance(expect, Text): expect = str(expect)
                 jmeter_request.append(JSONAssertion(json_path=check, expected_value=expect))
+            elif check == 'status_code':
+                expect = validator["expect"]
+                if not isinstance(expect, Text): expect = str(expect)
+                jmeter_request.append(ResponseAssertion(test_field=TestField.RESPONSE_CODE, test_type=TestType.EQUALS, patterns=[expect]))
     return jmeter_request, jmeter_variables
 
 
