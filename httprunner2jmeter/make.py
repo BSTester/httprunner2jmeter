@@ -288,7 +288,7 @@ def make_plan_teststep(teststep: Dict, jmeter_config = {}, jmeter_variables: Lis
                 check = '${}'.format(check[4:])
                 expect = validator["expect"]
                 if not isinstance(expect, Text): expect = str(expect)
-                jmeter_request.append(JSONAssertion(json_path=check, expected_value=expect))
+                jmeter_request.append(JSONAssertion(json_path=check, expected_value=expect, validation=True))
             elif check == 'status_code':
                 expect = validator["expect"]
                 if not isinstance(expect, Text): expect = str(expect)
